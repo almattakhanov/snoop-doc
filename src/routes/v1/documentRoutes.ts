@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAverageAge } from '../../controllers/userController';
+import { generateDocument } from '../../controllers/documentController';
 import { authMiddleware } from '../../middlewares/authMiddleware';
 
 const router = Router();
@@ -51,7 +51,6 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-router.post('/doc/generate-pdf', authMiddleware,});
+router.post('/generate-pdf', authMiddleware, generateDocument);
 
-
-module.exports = router;
+export default router;

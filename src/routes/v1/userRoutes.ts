@@ -28,6 +28,6 @@ const router = Router();
  *       403:
  *         description: Forbidden - Недействительный токен
  */
-router.get('/users/average-age', authMiddleware, getAverageAge);
+router.get('/v1/user/generate-pdf', authMiddleware, getAverageAge);
 
 export default router;
