@@ -1,5 +1,4 @@
 import carbone from 'carbone';
-import logger from '../config/winston';
 import { downloadTemplateIfUpdated } from './templateService';
 
 carbone.set({
@@ -7,20 +6,18 @@ carbone.set({
   startFactory: true,
 });
 
-export const generateDocument = async (
+export const carbonateTemplate = async (
   templatePath: string,
   data: object,
-  options = { convertTo: 'pdf' },
-) => {
+): Promise<Buffer> => {
   const localFilePath = await downloadTemplateIfUpdated(templatePath);
 
   return new Promise<Buffer>((resolve, reject) => {
-    carbone.render(localFilePath, data, options, (err, result) => {
+    carbone.render(localFilePath, data, { convertTo: 'pdf' }, (err, result) => {
       if (err) {
-        logger.error('Carbone rendering error', err);
         return reject(err);
       }
-      resolve(result);
+      resolve(result as Buffer);
     });
   });
 };

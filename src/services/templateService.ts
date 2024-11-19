@@ -31,9 +31,9 @@ const deleteOldFiles = async (templatePath: string, newEtag: string) => {
 export const downloadTemplateIfUpdated = async (templatePath: string) => {
   if (!downloadPromises[templatePath]) {
     downloadPromises[templatePath] = (async () => {
-      const stat = await statObjectWithRetry(templatePath);
-      const remoteEtag = stat.etag;
-      const localFilePath = generateFilePath(templatePath, remoteEtag);
+      const templateInfo = await statObjectWithRetry(templatePath);
+      const fileEtag = templateInfo?.etag as string;
+      const localFilePath = generateFilePath(templatePath, fileEtag);
 
       if (fs.existsSync(localFilePath)) {
         logger.info(`Using cached template: ${localFilePath}`);

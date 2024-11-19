@@ -17,15 +17,11 @@ const RETRY_DELAY = 1000;
 export const statObjectWithRetry = async (templatePath: string) => {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      return await new Promise((resolve, reject) => {
-        minioClient.statObject(BUCKET_NAME, templatePath, (err, stat) => {
-          if (err) return reject(err);
-          resolve(stat);
-        });
-      });
+      return await minioClient.statObject(BUCKET_NAME, templatePath);
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '';
       logger.error(
-        `Error during statObject. Attempt ${attempt} of ${MAX_RETRIES}. ${err.message}`,
+        `Error during statObject. Attempt ${attempt} of ${MAX_RETRIES} for templatePath ${templatePath}. ${errorMessage}`,
       );
       if (attempt < MAX_RETRIES) await delay(RETRY_DELAY);
       else throw err;
@@ -51,7 +47,7 @@ export const downloadFileWithRetry = async (
         );
       });
     } catch (err) {
-        logger.error(
+      logger.error(
         `Error during download. Attempt ${attempt} of ${MAX_RETRIES}. ${err.message}`,
       );
       if (attempt < MAX_RETRIES) await delay(RETRY_DELAY);
