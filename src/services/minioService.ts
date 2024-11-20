@@ -1,8 +1,14 @@
-import Minio from 'minio';
-import logger from '../config/winston';
-import delay from '../utils/delay';
+import fs from 'fs';
+import path from 'path';
+import { Client } from 'minio';
+import {
+  ensureDirectoryExists,
+  getLocalFilePath,
+  TEMPLATES_DIR,
+} from './fileService';
 
-const minioClient = new Minio.Client({
+// Настройка MinIO клиента
+const minioClient = new Client({
   endPoint: process.env.END_POINT || '',
   useSSL: true,
   accessKey: process.env.ACCESS_KEY || '',
@@ -11,47 +17,55 @@ const minioClient = new Minio.Client({
 
 const BUCKET_NAME = process.env.BUCKET_NAME || '';
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000;
 
-export const statObjectWithRetry = async (templatePath: string) => {
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      return await minioClient.statObject(BUCKET_NAME, templatePath);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '';
-      logger.error(
-        `Error during statObject. Attempt ${attempt} of ${MAX_RETRIES} for templatePath ${templatePath}. ${errorMessage}`,
-      );
-      if (attempt < MAX_RETRIES) await delay(RETRY_DELAY);
-      else throw err;
-    }
+
+// Получить ETag из MinIO
+const getETagFromMinIO = async (templatePath: string): Promise<string> => {
+  try {
+    const { etag } = await minioClient.statObject(BUCKET_NAME, templatePath);
+    return etag;
+  } catch (error) {
+    throw error;
   }
 };
 
-export const downloadFileWithRetry = async (
+// Скачивание шаблона из MinIO
+const downloadTemplateFromMinIO = async (
   templatePath: string,
-  localFilePath: string,
-) => {
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      return await new Promise<void>((resolve, reject) => {
-        minioClient.fGetObject(
-          BUCKET_NAME,
-          templatePath,
-          localFilePath,
-          (err) => {
-            if (err) return reject(err);
-            resolve();
-          },
-        );
+  newEtag: string,
+): Promise<string> => {
+  const tempFilePath = path.join(TEMPLATES_DIR, `tmp_${newEtag}`);
+  const localFilePath = getLocalFilePath(templatePath, newEtag);
+
+  return new Promise((resolve, reject) => {
+    minioClient
+      .getObject(BUCKET_NAME, templatePath)
+      .then((dataStream) => {
+        const fileStream = fs.createWriteStream(tempFilePath);
+
+        dataStream.pipe(fileStream);
+
+        dataStream.on('end', async () => {
+          try {
+            ensureDirectoryExists(localFilePath);
+            fs.renameSync(tempFilePath, localFilePath); // Переименовываем файл
+            resolve(localFilePath);
+          } catch (renameError) {
+            reject(renameError);
+          }
+        });
+
+        dataStream.on('error', async (error) => {
+          try {
+            fs.unlinkSync(tempFilePath); // Удаляем временный файл в случае ошибки
+          } catch {}
+          reject(error);
+        });
+      })
+      .catch((err) => {
+        reject(err);
       });
-    } catch (err) {
-      logger.error(
-        `Error during download. Attempt ${attempt} of ${MAX_RETRIES}. ${err.message}`,
-      );
-      if (attempt < MAX_RETRIES) await delay(RETRY_DELAY);
-      else throw err;
-    }
-  }
+  });
 };
+
+export { getETagFromMinIO, downloadTemplateFromMinIO };

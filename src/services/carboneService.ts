@@ -1,23 +1,32 @@
 import carbone from 'carbone';
-import { downloadTemplateIfUpdated } from './templateService';
+import { getTemplate } from './documentService';
+import { globalLimit } from '../utils/globalLimit';
 
 carbone.set({
   factories: 3,
   startFactory: true,
 });
 
-export const carbonateTemplate = async (
-  templatePath: string,
+// Генерация документа с Carbone
+const generatePdf = async (
+  templateName: string,
   data: object,
 ): Promise<Buffer> => {
-  const localFilePath = await downloadTemplateIfUpdated(templatePath);
+  return globalLimit(async () => {
+    const templatePath = await getTemplate(templateName);
 
-  return new Promise<Buffer>((resolve, reject) => {
-    carbone.render(localFilePath, data, { convertTo: 'pdf' }, (err, result) => {
-      if (err) {
-        return reject(err);
-      }
-      resolve(result as Buffer);
+    return new Promise((resolve, reject) => {
+      carbone.render(
+        templatePath,
+        data,
+        { convertTo: 'pdf' },
+        (err, result) => {
+          if (err) return reject(err);
+          resolve(result as Buffer);
+        },
+      );
     });
   });
 };
+
+export { generatePdf };
